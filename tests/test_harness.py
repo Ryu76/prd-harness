@@ -17,7 +17,7 @@ class HarnessTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.repo = self.base / "repo"
         self.repo.mkdir()
-        subprocess.run(["git", "init", "-b", "main"], cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(["git", "init", "--template=", "-b", "main"], cwd=self.repo, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=self.repo, check=True)
         subprocess.run(["git", "config", "user.name", "Harness Test"], cwd=self.repo, check=True)
         (self.repo / "src").mkdir()
