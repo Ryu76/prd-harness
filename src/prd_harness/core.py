@@ -21,7 +21,7 @@ TERMINAL_STATES = {
     "INTERRUPTED",
 }
 REQUIRED_FALSE = ("allow_commit", "allow_push", "allow_db_change", "allow_network")
-TEST_PREFIXES = ("python -m unittest", "python -m pytest", "pytest ", "npm test", "npm run build", "cargo test")
+TEST_PREFIXES = ("python -m unittest", "python -m pytest", "pytest ", "npm test", "npm run build", "npm --prefix frontend run build", "cargo test")
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{2,80}$")
 
 
