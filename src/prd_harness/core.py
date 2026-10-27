@@ -18,10 +18,24 @@ TERMINAL_STATES = {
     "BLOCKED",
     "AUTH_REQUIRED",
     "QUOTA_BLOCKED",
+    "PERMISSION_REQUIRED",
     "INTERRUPTED",
 }
 REQUIRED_FALSE = ("allow_commit", "allow_push", "allow_db_change", "allow_network")
-TEST_PREFIXES = ("python -m unittest", "python -m pytest", "pytest ", "npm test", "npm run build", "npm --prefix frontend run build", "cargo test")
+TEST_PREFIXES = (
+    "conda run -n monitor_backend python -m unittest",
+    "conda run -n monitor_backend python -m pytest",
+    'cmd /d /c "set PYTHONPATH=backend&& conda run -n monitor_backend python -m pytest',
+    "conda run -n monitor_backend python -m compileall",
+    "python -m unittest",
+    "python -m pytest",
+    "pytest ",
+    "npm test",
+    "npm run build",
+    "npm --prefix frontend run build",
+    "git diff --check",
+    "cargo test",
+)
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{2,80}$")
 
 
@@ -305,7 +319,9 @@ class Harness:
                     return process.returncode or 1, redact(stdout), redact(stderr), True
 
     def _allowed_change(self, path: str, allowed_paths: list[str]) -> bool:
-        normalized = path.replace("\\", "/").lstrip("./")
+        normalized = path.replace("\\", "/")
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
         for allowed in allowed_paths:
             prefix = allowed.replace("\\", "/").strip("/")
             if normalized == prefix or normalized.startswith(prefix + "/"):
@@ -345,11 +361,21 @@ class Harness:
         os.replace(approved_prd, running_prd)
         shutil.copy2(running_prd, run_dir / "input.md")
         _, body = parse_prd(running_prd.read_text(encoding="utf-8"))
-        prompt = (
-            "Execute only this approved local PRD. Do not commit, push, deploy, change database state, "
-            "enable network access, or read/write credentials. Stay within allowed_paths. "
-            "Return a concise summary and test result.\n\n" + body
-        )
+        if "PROJECT_TOP_LEVEL_AUTONOMY" in body:
+            prompt = (
+                "PROJECT_TOP_LEVEL_AUTONOMY: The user explicitly authorized all necessary project-local actions "
+                "without further questions. Work only in this dedicated worktree. Never delete the project/worktree "
+                "or its .git directory and never use destructive bulk-delete commands. Preserve the project and "
+                "record progress and verification evidence.\n\n" + body
+            )
+        else:
+            prompt = (
+                "Execute only this approved local PRD. Do not deploy, change database state, or read/write credentials. "
+                "Do not commit/push unless this PRD explicitly requests GitHub upload under the injected AI Pro global policy. "
+                "Stay within allowed_paths. Project-scoped dependency installation "
+                "is allowed only under the injected AI Pro global policy; other network access is prohibited. "
+                "Return a concise summary and test result.\n\n" + body
+            )
         prompt_path = run_dir / "prompt.md"
         prompt_path.write_text(prompt, encoding="utf-8")
         running_state = {
@@ -379,31 +405,32 @@ class Harness:
             )
             os.replace(running_prd, self.paths["failed"] / running_prd.name)
             return result
+        text_options = {"encoding": "utf-8", "errors": "replace"}
         unstaged = subprocess.run(
             ["git", "-C", str(validation.repository), "diff", "--name-only"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, **text_options,
         )
         staged = subprocess.run(
             ["git", "-C", str(validation.repository), "diff", "--cached", "--name-only"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, **text_options,
         )
         untracked = subprocess.run(
             ["git", "-C", str(validation.repository), "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, **text_options,
         )
         changed = sorted(set(unstaged.stdout.splitlines() + staged.stdout.splitlines() + untracked.stdout.splitlines()))
         diff = subprocess.run(
             ["git", "-C", str(validation.repository), "diff", "--binary"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, **text_options,
         ).stdout
         diff += subprocess.run(
             ["git", "-C", str(validation.repository), "diff", "--cached", "--binary"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, **text_options,
         ).stdout
         for relative_path in untracked.stdout.splitlines():
             created = subprocess.run(
                 ["git", "-C", str(validation.repository), "diff", "--no-index", "--binary", "--", "/dev/null", relative_path],
-                capture_output=True, text=True, check=False,
+                capture_output=True, text=True, check=False, **text_options,
             )
             diff += created.stdout
         (run_dir / "diff.patch").write_text(redact(diff), encoding="utf-8")
@@ -414,6 +441,9 @@ class Harness:
             elif exit_code == 4:
                 status = "QUOTA_BLOCKED"
                 next_action = "사용량 회복 뒤 새 작업 승인"
+            elif exit_code == 5:
+                status = "PERMISSION_REQUIRED"
+                next_action = "요청된 추가 권한의 명령·대상·영향을 사용자가 검토·승인"
             else:
                 status = "BLOCKED"
                 next_action = "executor 오류를 사람이 검토하고 새 PRD로 재승인"

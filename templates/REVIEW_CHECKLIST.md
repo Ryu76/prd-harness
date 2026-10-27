@@ -12,6 +12,7 @@
 - [ ] 수정 금지 대상이 명시돼 있다.
 - [ ] API 키, 인증 정보, DB 스키마, 배포 설정 변경이 없다.
 - [ ] `allow_commit`, `allow_push`, `allow_db_change`, `allow_network`가 모두 `false`다.
+- [ ] GitHub 업로드가 필요하면 `github_delivery: branch`와 대상 저장소/branch 정책이 명시돼 있다. 필요 없으면 `none`이다.
 - [ ] `risk: low`다.
 
 ## 검증과 승인

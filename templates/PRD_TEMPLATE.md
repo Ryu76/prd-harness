@@ -10,6 +10,7 @@ allow_commit: false
 allow_push: false
 allow_db_change: false
 allow_network: false
+github_delivery: none # none | branch (GitHub branch push requires explicit PRD approval)
 allowed_paths:
   - src/example.py
 tests:

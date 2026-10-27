@@ -122,6 +122,15 @@ acceptance:
         self.assertTrue((self.harness_root / "runs" / "sample-20260914-001" / "diff.patch").exists())
         self.assertTrue((self.harness_root / "failed" / "sample.md").exists())
 
+    def test_dotfile_is_accepted_when_exactly_allowlisted(self) -> None:
+        harness = self._harness("from pathlib import Path\nPath('.gitignore').write_text('local-secret\\n', encoding='utf-8')\n")
+        self._approve(self._prd(allowed=".gitignore"))
+        with patch.dict(os.environ, self._environment_without_api_keys(), clear=True):
+            result = harness.process_once()
+        assert result is not None
+        self.assertEqual("READY_FOR_REVIEW", result["status"])
+        self.assertEqual([".gitignore"], result["changed_files"])
+
     def test_recovery_marks_running_prd_interrupted_without_rerun(self) -> None:
         harness = self._harness("raise SystemExit('must not run')")
         running = self.harness_root / "running"
@@ -149,6 +158,16 @@ acceptance:
             result = harness.process_once()
         assert result is not None
         self.assertEqual("QUOTA_BLOCKED", result["status"])
+        self.assertTrue((self.harness_root / "failed" / "sample.md").exists())
+
+    def test_permission_required_from_exit_code_5(self) -> None:
+        harness = self._harness("raise SystemExit(5)")
+        self._approve(self._prd())
+        with patch.dict(os.environ, self._environment_without_api_keys(), clear=True):
+            result = harness.process_once()
+        assert result is not None
+        self.assertEqual("PERMISSION_REQUIRED", result["status"])
+        self.assertIn("추가 권한", result["next_action"])
         self.assertTrue((self.harness_root / "failed" / "sample.md").exists())
 
 

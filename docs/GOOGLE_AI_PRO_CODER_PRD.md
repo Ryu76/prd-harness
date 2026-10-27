@@ -51,9 +51,10 @@ PRD 본문에는 아래 내용이 있어야 한다.
 승인된 PRD의 수정 범위 안에서만 작업한다.
 수정 전 관련 코드와 기존 테스트를 읽는다.
 가장 작은 수정으로 요구사항을 충족한다.
+PRD `allowed_paths` 안 파일 수정과 프로젝트 범위 의존성 설치는 기본 승인이다. Python은 PRD가 지정한 Conda 환경, JavaScript는 기존 lockfile/package manager만 사용하며 전역·OS 설치는 하지 않는다.
 API 키, 비밀값, 인증 파일, 배포 설정, DB 스키마는 생성하거나 수정하지 않는다.
-git commit, push, 배포, 패키지 전역 설치를 하지 않는다.
-불확실하거나 범위를 벗어난 요구는 변경하지 않고 BLOCKED 사유를 남긴다.
+GitHub 업로드가 PRD에서 명시적으로 승인된 경우에만 새 `ai-pro/<job-id>` 브랜치로 commit/push한다. 그 외에는 commit/push하지 않는다.
+불확실하거나 범위를 벗어난 요구는 변경하지 않고 `[PERMISSION_REQUIRED]`와 이유·명령·대상·영향을 남긴다.
 구현 뒤 PRD의 테스트를 실행하고 변경 파일·테스트 결과·남은 위험을 요약한다.
 ```
 
@@ -62,8 +63,8 @@ git commit, push, 배포, 패키지 전역 설치를 하지 않는다.
 - `GEMINI_API_KEY`, `GOOGLE_API_KEY` 또는 다른 API 키를 요구·생성·주입하지 않는다.
 - SDK/API fallback을 사용하지 않는다.
 - OAuth 로그인·동의·결제·초과 과금 설정을 자동으로 처리하지 않는다.
-- git commit/push, 배포, DB 변경, 권한 변경을 수행하지 않는다.
-- PRD 범위 밖 파일을 수정하지 않는다.
+- 명시되지 않은 GitHub upload, 배포, DB 변경, 권한 변경을 수행하지 않는다.
+- PRD 범위 밖 파일을 수정하지 않는다. 추가 권한이 필요하면 `[PERMISSION_REQUIRED]`로 중단한다.
 
 ## 7. 상태와 종료 기준
 
@@ -73,6 +74,7 @@ git commit, push, 배포, 패키지 전역 설치를 하지 않는다.
 | `TEST_PASSED` | 선언된 테스트 성공 | 검토 대기 가능 |
 | `TEST_FAILED` | 테스트 실패 | 실패 로그와 재현 방법 반환 |
 | `BLOCKED` | 요구사항 모호·범위 이탈 | 코드 변경 없이 사유 반환 |
+| `PERMISSION_REQUIRED` | PRD/기본 정책 밖 권한 필요 | 이유·명령·대상·영향을 사용자가 검토·승인 |
 | `AUTH_REQUIRED` | 로그인 세션 없음·만료 | 사용자 수동 로그인 필요 |
 | `QUOTA_BLOCKED` | AI Pro 사용량 한도 도달 | 사용량 회복 뒤 신규 실행 |
 
@@ -94,7 +96,7 @@ git commit, push, 배포, 패키지 전역 설치를 하지 않는다.
 ### 사용 범위 및 안전 통제
 이 플래그는 사람의 개입을 차단하므로 **매우 엄격한 조건하에 하네스 데몬 내부의 어댑터에서만 제한적으로 사용**한다.
 
-1. **단일 진입점 제한**: 일반 사용자의 수동 CLI 실행 시에는 절대 사용하지 않으며, 오직 `scripts/agy_executor.py` 래퍼 스크립트를 통한 데몬의 비대화형(non-interactive) 실행 시에만 제한적으로 주입한다.
+1. **단일 진입점 제한**: 일반 수동 CLI 실행에는 사용하지 않으며, 사용자 명시 승인이 있는 `scripts/agy_executor_harness_only.py` 어댑터를 통한 하네스 비대화형 실행에서만 제한적으로 주입한다.
 2. **사전 검증(Pre-validation) 의존**: 하네스 코어(`core.py`)가 PRD의 `status: approved`, `risk: low`, 깨끗한 작업 트리(worktree), API 키 비노출 등의 사전 조건을 완벽히 통과시킨 상태에서만 이 플래그가 동반된 실행을 허용한다.
 3. **사후 검증(Post-validation) 의존**: 이 플래그로 인해 AI가 `allowed_paths` 범위를 벗어난 파일을 임의로 수정하더라도, 데몬의 사후 diff 검사 로직에 의해 차단(`BLOCKED`)되므로 치명적인 시스템 변경을 막을 수 있다.
 4. **자동 반영 금지**: 플래그를 사용해 실행이 성공하더라도 결과는 항상 `READY_FOR_REVIEW` 상태에 머물며, 사람의 최종 확인(diff 검토) 전에는 어떠한 자동 commit, push, 네트워크 배포도 발생하지 않는다.

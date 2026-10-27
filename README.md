@@ -71,7 +71,7 @@ python -m prd_harness \
 
 ## AI Pro (Antigravity CLI) 연동
 
-Google AI Pro 코더(Antigravity CLI)를 executor로 사용하려면 래퍼 스크립트를 지정합니다.
+Google AI Pro 코더(Antigravity CLI)를 executor로 사용하려면 래퍼 스크립트를 지정합니다. 모든 AI Pro 작업에는 [`docs/AI_PRO_GLOBAL_WORK_POLICY.md`](docs/AI_PRO_GLOBAL_WORK_POLICY.md)가 executor prompt로 주입됩니다. 이 정책은 PRD 범위 안 파일 수정과 프로젝트 범위 의존성 설치를 기본 승인하고, 추가 권한은 `PERMISSION_REQUIRED`로 사용자에게 재요청하도록 정합니다. GitHub 업로드가 PRD에서 명시적으로 승인된 경우 기존 프로젝트는 `ai-pro/<job-id>` 새 브랜치를, 신규 프로젝트는 검증 뒤 private 저장소를 사용합니다.
 
 ```bash
 python -m prd_harness \
